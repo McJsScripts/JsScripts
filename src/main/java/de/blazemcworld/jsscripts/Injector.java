@@ -36,7 +36,7 @@ public class Injector {
     public static Object invokeCallback(int id) {
         List<Object> info = callbackInfo;
         callbackInfo = new ArrayList<>();
-        return callbacks.get(id).invoke(callbackInfo);
+        return callbacks.get(id).invoke(info);
     }
 
     public static void transformMethod(String className, String methodName, Consumer<MethodNode> transformer) {
