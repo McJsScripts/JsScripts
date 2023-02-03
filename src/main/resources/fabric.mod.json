@@ -3,9 +3,14 @@
     "id": "jsscripts",
     "version": "${version}",
     "name": "JsScripts",
-    "description": "",
-    "authors": [],
-    "contact": {},
+    "description": "A minecraft Fabric mod for modding Minecraft using JavaScript.",
+    "authors": [
+        "BlazeMCworld"
+    ],
+    "contact": {
+        "sources": "https://github.com/BlazeMCworld/JsScripts",
+        "issues": "https://github.com/BlazeMCworld/JsScripts/issues"
+    },
     "license": "LGPL-3.0",
     "icon": "assets/jsscripts/icon.png",
     "environment": "client",
