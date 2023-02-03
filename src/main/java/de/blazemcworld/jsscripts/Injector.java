@@ -19,7 +19,7 @@ public class Injector {
     private static final Instrumentation inst = ByteBuddyAgent.getInstrumentation();
     private static final List<ClassFileTransformer> transformers = new ArrayList<>();
     private static final List<InjectionCallback> callbacks = new ArrayList<>();
-    private static final List<Object> callbackInfo = new ArrayList<>();
+    private static List<Object> callbackInfo = new ArrayList<>();
 
     @SuppressWarnings("unused")
     public static int registerCallback(InjectionCallback cb) {
@@ -34,9 +34,9 @@ public class Injector {
 
     @SuppressWarnings("unused")
     public static Object invokeCallback(int id) {
-        Object result = callbacks.get(id).invoke(callbackInfo);
-        callbackInfo.clear();
-        return result;
+        List<Object> info = callbackInfo;
+        callbackInfo = new ArrayList<>();
+        return callbacks.get(id).invoke(callbackInfo);
     }
 
     public static void transformMethod(String className, String methodName, Consumer<MethodNode> transformer) {
