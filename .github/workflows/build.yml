@@ -24,4 +24,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: JsScripts
-          path: ./build/libs/JsScripts*.jar
+          path: ./build/libs/jscripts*.jar
