@@ -32,15 +32,22 @@ public class ScriptManager {
         if (!scriptDir.exists()) scriptDir.mkdirs();
 
         injectMappings();
+        loadScriptsIn(scriptDir);
+    }
 
-        for (File scriptFile : scriptDir.listFiles()) {
-            if (!scriptFile.getName().endsWith(".js")) {
+    private static void loadScriptsIn(File dir) {
+        for (File file : dir.listFiles()) {
+            if (file.isDirectory()) {
+                loadScriptsIn(file);
+                continue;
+            }
+            if (!file.getName().endsWith(".js")) {
                 continue;
             }
             try {
-                scripts.add(new Script(scriptFile));
+                scripts.add(new Script(file));
             } catch (Exception err) {
-                JsScripts.LOGGER.error("Error initializing " + scriptFile);
+                JsScripts.LOGGER.error("Error initializing " + file);
                 err.printStackTrace();
             }
         }
