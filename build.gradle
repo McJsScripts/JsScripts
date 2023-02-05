@@ -25,9 +25,6 @@ dependencies {
     implementation 'org.graalvm.truffle:truffle-api:22.3.0'
 
     implementation 'net.bytebuddy:byte-buddy-agent:1.12.19'
-
-    implementation 'org.reflections:reflections:0.10.2'
-    implementation 'org.javassist:javassist:3.29.2-GA'
 }
 
 processResources {
@@ -64,9 +61,6 @@ shadowJar {
         include(dependency("org.graalvm.truffle:truffle-api"))
 
         include(dependency("net.bytebuddy:byte-buddy-agent"))
-
-        include(dependency("org.reflections:reflections"))
-        include(dependency("org.javassist:javassist"))
     }
 }
 

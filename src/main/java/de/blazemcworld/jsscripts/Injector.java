@@ -126,4 +126,8 @@ public class Injector {
         node.accept(writer);
         return writer.toByteArray();
     }
+
+    public static Class<?>[] listLoadedClasses() {
+        return inst.getAllLoadedClasses();
+    }
 }
