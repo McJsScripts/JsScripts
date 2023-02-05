@@ -32,10 +32,11 @@ public class TypingGen {
             ClassLoader cl = JsScripts.class.getClassLoader();
 
             Set<String> all = new HashSet<>();
+            Set<String> forced = new HashSet<>();
 
             for (String target : targets.split(" ")) {
                 if (!target.endsWith("*")) {
-                    all.add(Mappings.remapClass("named", Mappings.current(), target));
+                    forced.add(Mappings.remapClass("named", Mappings.current(), target));
                 }
             }
 
@@ -99,7 +100,7 @@ public class TypingGen {
             }
             javaClasses.close();
 
-            JsScripts.displayChat(Text.literal("Found " + all.size() + " classes!").formatted(Formatting.AQUA));
+            JsScripts.displayChat(Text.literal("Found " + (all.size() + forced.size()) + " classes!").formatted(Formatting.AQUA));
 
             all = all.stream().filter(name -> {
                 if (name.startsWith("jdk")) return false;
@@ -109,13 +110,12 @@ public class TypingGen {
                     if (target.endsWith("*") && name.startsWith(target.substring(0, target.length() - 1))) {
                         return true;
                     }
-                    if (target.equals(name)) {
-                        return true;
-                    }
                 }
 
                 return false;
             }).collect(Collectors.toSet());
+
+            all.addAll(forced);
 
             JsScripts.displayChat(Text.literal("Of which " + all.size() + " classes match the filter.").formatted(Formatting.AQUA));
 
