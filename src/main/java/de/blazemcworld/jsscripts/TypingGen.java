@@ -153,6 +153,7 @@ public class TypingGen {
     }
 
     private static void genTypesFor(String currentName, Path outDir, ClassLoader cl) throws Exception {
+        currentName = Mappings.remapClass("named", Mappings.current(), currentName);
         InputStream stream = cl.getResourceAsStream(currentName.replace('.', '/') + ".class");
         if (stream == null) {
             stream = Class.forName(currentName).getClassLoader().getResourceAsStream(currentName.replace('.', '/') + ".class");
