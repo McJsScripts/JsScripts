@@ -86,6 +86,7 @@ public class TypingGen {
         Path out = JsScripts.MC.runDirectory.toPath()
                 .resolve("JsScripts").resolve("types");
         ClassLoader cl = JsScripts.class.getClassLoader();
+        className = Mappings.remapClass("named",Mappings.current(), className);
         genTypesFor(className, out, cl);
     }
 

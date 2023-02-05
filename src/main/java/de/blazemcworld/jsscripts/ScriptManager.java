@@ -69,10 +69,13 @@ public class ScriptManager {
                     err.printStackTrace();
                 }
             }
+        }
+        for (Script s : scripts) {
             s.close();
         }
         scripts.clear();
         exports.clear();
+        exportCallbacks.clear();
     }
 
     private static void injectMappings() {
