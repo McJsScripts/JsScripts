@@ -25,6 +25,7 @@ public class Script {
         ctx = Context.newBuilder()
                 .allowAllAccess(true)
                 .logHandler(System.out)
+                .option("engine.WarnInterpreterOnly", "false")
                 .build();
         Value bindings = ctx.getBindings("js");
         bindings.putMember("script", this);

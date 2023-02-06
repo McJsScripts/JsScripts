@@ -28,10 +28,14 @@ public class JsScriptsCmd {
                 )
                 .then(literal("gen_types")
                         .executes((e) -> {
-                            JsScripts.displayChat(Text.literal("Invalid usage! Try one of:").formatted(Formatting.AQUA));
-                            JsScripts.displayChat(Text.literal("/jsscripts gen_types *").formatted(Formatting.AQUA));
-                            JsScripts.displayChat(Text.literal("/jsscripts gen_types some.package.*").formatted(Formatting.AQUA));
-                            JsScripts.displayChat(Text.literal("/jsscripts gen_types some.class.Name").formatted(Formatting.AQUA));
+                            JsScripts.displayChat(Text.literal("Invalid usage! Usage:").formatted(Formatting.AQUA));
+                            JsScripts.displayChat(Text.literal("/jsscripts gen_types <args>").formatted(Formatting.AQUA));
+                            JsScripts.displayChat(Text.literal("Specific classes: the.class.Name"));
+                            JsScripts.displayChat(Text.literal("All in a package: some.package.*"));
+                            JsScripts.displayChat(Text.literal("Enable asm for methods: -asm"));
+                            JsScripts.displayChat(Text.literal("Remap asm output: -remap"));
+                            JsScripts.displayChat(Text.literal("Show private methods: -private"));
+                            JsScripts.displayChat(Text.literal("Example: /jsscripts gen_types java.lang.System -private -asm"));
                             return 1;
                         })
                         .then(argument("classes", StringArgumentType.greedyString())

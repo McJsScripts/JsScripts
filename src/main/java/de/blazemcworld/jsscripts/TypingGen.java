@@ -10,17 +10,25 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.Textifier;
+import org.objectweb.asm.util.TraceMethodVisitor;
 
 import java.io.File;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class TypingGen {
+
+    private static final Pattern remapAsmPattern = Pattern.compile("net/minecraft/class_\\d+(\\.(method|field)_\\d+)?");
 
     public static void genTypesIn(String targets) {
         try {
@@ -34,90 +42,104 @@ public class TypingGen {
             Set<String> all = new HashSet<>();
             Set<String> forced = new HashSet<>();
 
+            Set<String> optionFlags = new HashSet<>();
+
+            boolean needsScan = false;
+
             for (String target : targets.split(" ")) {
-                if (!target.endsWith("*")) {
-                    forced.add(Mappings.remapClass("named", Mappings.current(), target));
+                if (target.endsWith("*")) {
+                    needsScan = true;
+                    continue;
                 }
+                if (target.startsWith("-")) {
+                    optionFlags.add(target.substring(1).toLowerCase());
+                    continue;
+                }
+                forced.add(Mappings.remapClass("named", Mappings.current(), target));
             }
 
-            Set<String> checkedPackages = new HashSet<>();
+            if (needsScan) {
+                Set<String> checkedPackages = new HashSet<>();
 
-            List<FileSystem> fsList = new ArrayList<>();
+                List<FileSystem> fsList = new ArrayList<>();
 
-            for (Class<?> c : Injector.listLoadedClasses()) {
-                String p = c.getPackageName();
-                while (true) {
-                    if (checkedPackages.contains(p)) break;
-                    checkedPackages.add(p);
+                for (Class<?> c : Injector.listLoadedClasses()) {
+                    String p = c.getPackageName();
+                    while (true) {
+                        if (checkedPackages.contains(p)) break;
+                        checkedPackages.add(p);
 
-                    Enumeration<URL> enu = cl.getResources(p.replace('.', '/'));
+                        Enumeration<URL> enu = cl.getResources(p.replace('.', '/'));
 
-                    while (enu.hasMoreElements()) {
-                        URI u = enu.nextElement().toURI();
+                        while (enu.hasMoreElements()) {
+                            URI u = enu.nextElement().toURI();
 
-                        try {
-                            FileSystems.getFileSystem(u);
-                        } catch (FileSystemNotFoundException err) {
-                            HashMap<String, Boolean> options = new HashMap<>();
-                            options.put("create", true);
-                            fsList.add(FileSystems.newFileSystem(u, options));
-                        }
+                            try {
+                                FileSystems.getFileSystem(u);
+                            } catch (FileSystemNotFoundException err) {
+                                HashMap<String, Boolean> options = new HashMap<>();
+                                options.put("create", true);
+                                fsList.add(FileSystems.newFileSystem(u, options));
+                            }
 
-                        try (Stream<Path> javaClasses = Files.walk(Path.of(u))) {
-                            for (Path cp : javaClasses.collect(Collectors.toSet())) {
-                                String str = cp.toString();
-                                if (str.endsWith(".class")) {
-                                    all.add(str.substring(1).replaceAll("/", ".").substring(0, str.length() - 7));
+                            try (Stream<Path> javaClasses = Files.walk(Path.of(u))) {
+                                for (Path cp : javaClasses.collect(Collectors.toSet())) {
+                                    String str = cp.toString();
+                                    if (str.endsWith(".class")) {
+                                        all.add(str.substring(1).replaceAll("/", ".").substring(0, str.length() - 7));
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if (!p.contains(".")) {
-                        break;
-                    }
-                    p = p.substring(0, p.indexOf("."));
-                }
-            }
-
-            for (FileSystem fs : fsList) {
-                fs.close();
-            }
-
-            FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
-
-            Stream<Path> javaClasses = Files.walk(fs.getPath("/"));
-            for (Path path : javaClasses.collect(Collectors.toSet())) {
-                List<String> parts = new ArrayList<>(Arrays.asList(path.toString().split("/")));
-
-                if (parts.size() > 3) {
-                    parts = parts.subList(3, parts.size());
-                    if (parts.get(parts.size() - 1).endsWith(".class")) {
-                        String str = String.join(".", parts);
-                        all.add(str.substring(0, str.length() - 6));
-                    }
-                }
-            }
-            javaClasses.close();
-
-            JsScripts.displayChat(Text.literal("Found " + (all.size() + forced.size()) + " classes!").formatted(Formatting.AQUA));
-
-            all = all.stream().filter(name -> {
-                if (name.startsWith("jdk")) return false;
-                if (!name.contains(".")) return false;
-
-                for (String target : targets.split(" ")) {
-                    if (target.endsWith("*") && name.startsWith(target.substring(0, target.length() - 1))) {
-                        return true;
+                        if (!p.contains(".")) {
+                            break;
+                        }
+                        p = p.substring(0, p.indexOf("."));
                     }
                 }
 
-                return false;
-            }).collect(Collectors.toSet());
+                for (FileSystem fs : fsList) {
+                    fs.close();
+                }
 
-            all.addAll(forced);
+                FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
 
-            JsScripts.displayChat(Text.literal("Of which " + all.size() + " classes match the filter.").formatted(Formatting.AQUA));
+                Stream<Path> javaClasses = Files.walk(fs.getPath("/"));
+                for (Path path : javaClasses.collect(Collectors.toSet())) {
+                    List<String> parts = new ArrayList<>(Arrays.asList(path.toString().split("/")));
+
+                    if (parts.size() > 3) {
+                        parts = parts.subList(3, parts.size());
+                        if (parts.get(parts.size() - 1).endsWith(".class")) {
+                            String str = String.join(".", parts);
+                            all.add(str.substring(0, str.length() - 6));
+                        }
+                    }
+                }
+                javaClasses.close();
+
+                JsScripts.displayChat(Text.literal("Found " + (all.size() + forced.size()) + " classes!").formatted(Formatting.AQUA));
+
+                all = all.stream().filter(name -> {
+                    if (name.startsWith("jdk")) return false;
+                    if (!name.contains(".")) return false;
+
+                    for (String target : targets.split(" ")) {
+                        if (target.endsWith("*") && name.startsWith(target.substring(0, target.length() - 1))) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }).collect(Collectors.toSet());
+
+                all.addAll(forced);
+                JsScripts.displayChat(Text.literal("Of which " + all.size() + " classes match the filter.").formatted(Formatting.AQUA));
+            } else {
+                all.addAll(forced);
+                JsScripts.displayChat(Text.literal("Got " + all.size() + " classes.").formatted(Formatting.AQUA));
+            }
 
             JsScripts.displayChat(Text.literal("Starting generation...").formatted(Formatting.AQUA));
 
@@ -133,7 +155,7 @@ public class TypingGen {
                     JsScripts.displayChat(Text.literal("Generating... " + progress + " of " + all.size() + " completed, est: " + est).formatted(Formatting.AQUA));
                 }
                 try {
-                    genTypesFor(currentName, out, cl);
+                    genTypesFor(currentName, out, cl, optionFlags);
                 } catch (Exception e) {
                     e.printStackTrace();
                     errors++;
@@ -152,7 +174,7 @@ public class TypingGen {
         }
     }
 
-    private static void genTypesFor(String currentName, Path outDir, ClassLoader cl) throws Exception {
+    private static void genTypesFor(String currentName, Path outDir, ClassLoader cl, Set<String> optionFlags) throws Exception {
         currentName = Mappings.remapClass("named", Mappings.current(), currentName);
         InputStream stream = cl.getResourceAsStream(currentName.replace('.', '/') + ".class");
         if (stream == null) {
@@ -189,11 +211,12 @@ public class TypingGen {
         }
 
         for (FieldNode field : classNode.fields) {
-            if ((field.access & Opcodes.ACC_PUBLIC) == 0) {
+            if ((field.access & Opcodes.ACC_PUBLIC) == 0 && !optionFlags.contains("private")) {
                 continue;
             }
 
-            fields.add("%s%s: %s;".formatted(
+            fields.add("%s%s%s: %s;".formatted(
+                    ((field.access & Opcodes.ACC_PUBLIC) == 0) ? "private " : "",
                     ((field.access & Opcodes.ACC_STATIC) != 0) ? "static " : "",
                     Mappings.remapField("named", namedName, Mappings.current(), "named", field.name),
                     parseSingleDescriptor(field.desc, imports)
@@ -201,7 +224,7 @@ public class TypingGen {
         }
 
         for (MethodNode method : classNode.methods) {
-            if ((method.access & Opcodes.ACC_PUBLIC) == 0 || method.name.equals("<clinit>")) {
+            if (((method.access & Opcodes.ACC_PUBLIC) == 0 || method.name.equals("<clinit>")) && !optionFlags.contains("private")) {
                 continue;
             }
             List<String> params = new ArrayList<>();
@@ -213,18 +236,36 @@ public class TypingGen {
             }
 
             if (method.name.equals("<init>")) {
-                methods.add("constructor(%s);".formatted(
-                        String.join(", ", params)
+                methods.add("constructor(%s); %s".formatted(
+                        String.join(", ", params),
+                        optionFlags.contains("asm") ? "/*" + getAsm(method, optionFlags.contains("remap")) + "*/" : ""
+                ));
+            } else if (method.name.equals("<clinit>")) {
+                methods.add("/*<clinit>%s*/".formatted(
+                        optionFlags.contains("asm") ? getAsm(method, optionFlags.contains("remap")) : ""
                 ));
             } else {
                 String displayName = Mappings.remapMethod("named", namedName, Mappings.current(), "named", method.name);
 
-                methods.add("%s%s(%s): %s;%s".formatted(
+                StringBuilder comment = new StringBuilder();
+
+                if (!displayName.equals(method.name)) {
+                    comment.append(method.name);
+                }
+                if (optionFlags.contains("asm")) {
+                    if (!comment.isEmpty()) {
+                        comment.append(" ");
+                    }
+                    comment.append(getAsm(method, optionFlags.contains("remap")));
+                }
+
+                methods.add("%s%s%s(%s): %s;%s".formatted(
+                        ((method.access & Opcodes.ACC_PUBLIC) == 0) ? "private " : "",
                         ((method.access & Opcodes.ACC_STATIC) != 0) ? "static " : "",
                         displayName,
                         String.join(", ", params),
                         info.getRight(),
-                        displayName.equals(method.name) ? "" : " //" + method.name
+                        comment.length() == 0 ? "" : "/*" + comment + "*/"
                 ));
             }
         }
@@ -253,6 +294,37 @@ public class TypingGen {
                 String.join("\n    ", fields),
                 String.join("\n    ", methods)
         ));
+    }
+
+    private static String getAsm(MethodNode method, boolean remap) {
+        Textifier t = new Textifier();
+        TraceMethodVisitor tmv = new TraceMethodVisitor(t);
+        method.accept(tmv);
+        StringWriter sw = new StringWriter();
+        t.print(new PrintWriter(sw));
+        StringBuilder out = new StringBuilder();
+
+        if (remap) {
+            Matcher m = remapAsmPattern.matcher(sw.toString());
+
+            while (m.find()) {
+                if (m.group().contains(".")) {
+                    String[] parts = m.group().split("\\.");
+                    parts[1] = Mappings.remapField(Mappings.current(), parts[0], Mappings.current(), "named", parts[1]);
+                    parts[1] = Mappings.remapMethod(Mappings.current(), parts[0], Mappings.current(), "named", parts[1]);
+                    parts[0] = Mappings.remapClass(Mappings.current(), "named", parts[0]).replace('.', '/');
+
+                    m.appendReplacement(out, parts[0] + "." + parts[1]);
+                } else {
+                    m.appendReplacement(out, Mappings.remapClass(Mappings.current(), "named", m.group()).replace('.','/'));
+                }
+            }
+            m.appendTail(out);
+        } else {
+            out.append(sw);
+        }
+
+        return " {\n" + out + "    \n    }";
     }
 
     private static String parseSingleDescriptor(String descriptor, HashMap<String, String> imports) throws Exception {

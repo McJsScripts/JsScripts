@@ -5,8 +5,11 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.util.CheckClassAdapter;
 import org.spongepowered.asm.transformers.MixinClassWriter;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
@@ -80,7 +83,17 @@ public class Injector {
                 @Override
                 public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
                     if (!Objects.equals(slashName, className)) return null;
-                    return transformer.apply(classfileBuffer);
+                    byte[] out = transformer.apply(classfileBuffer);
+
+                    if (out != null) {
+                        StringWriter sw = new StringWriter();
+                        CheckClassAdapter.verify(new ClassReader(out), JsScripts.class.getClassLoader(), false, new PrintWriter(sw));
+                        if (sw.toString().length() > 0) {
+                            JsScripts.LOGGER.warn(sw);
+                        }
+                    }
+
+                    return out;
                 }
             };
 
