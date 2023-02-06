@@ -19,9 +19,18 @@ jobs:
       - name: Setup gradlew permissions
         run: chmod +x gradlew
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build '-Pversion=${{ github.run_number }}'
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: JsScripts
-          path: ./build/libs/*
+          path: ./build/libs/jsscripts-${{ github.run_number }}.jar
+      - name: Publish Release
+        uses: marvinpinto/action-automatic-releases@v1.2.1
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "Build-${{ github.run_number }}"
+          prerelease: false
+          files: |
+            ./build/libs/jsscripts-${{ github.run_number }}.jar
+            LICENSE

@@ -6,7 +6,7 @@ plugins {
 
 import net.fabricmc.loom.task.RemapJarTask
 
-version = project.mod_version
+//version = project.mod_version -> set using "gradlew build '-Pversion=HERE'"
 group = project.maven_group
 
 repositories {
