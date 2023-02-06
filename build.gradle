@@ -2,6 +2,7 @@ plugins {
     id 'fabric-loom' version '1.0-SNAPSHOT'
     id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id "org.graalvm.plugin.compiler" version "0.1.0-alpha2"
 }
 
 import net.fabricmc.loom.task.RemapJarTask
@@ -11,6 +12,10 @@ group = project.maven_group
 
 repositories {
     mavenCentral()
+}
+
+graal {
+    version "22.3.0"
 }
 
 dependencies {
