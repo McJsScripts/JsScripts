@@ -122,11 +122,24 @@ public class Mappings {
         }
 
         try {
-            Class<?> parent = Class.forName(classDef.getName(current()).replace('/', '.')).getSuperclass();
+            Class<?> currentClass = Class.forName(classDef.getName(current()).replace('/', '.'));
+            Class<?> parent = currentClass.getSuperclass();
             if (parent != null) {
                 ClassDef def = getClass(current(), parent.getName());
                 if (def != null) {
-                    return getMethod(def, namespace, name);
+                    MethodDef res = getMethod(def, namespace, name);
+                    if (res != null) {
+                        return res;
+                    }
+                }
+            }
+            for (Class<?> iface : currentClass.getInterfaces()) {
+                ClassDef def = getClass(current(), iface.getName());
+                if (def != null) {
+                    MethodDef res = getMethod(def, namespace, name);
+                    if (res != null) {
+                        return res;
+                    }
                 }
             }
         } catch (ClassNotFoundException e) {
