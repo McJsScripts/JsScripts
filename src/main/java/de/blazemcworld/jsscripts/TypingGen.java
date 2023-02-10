@@ -33,7 +33,21 @@ public class TypingGen {
     public static void genTypesIn(String targets) {
         try {
             Path out = JsScripts.MC.runDirectory.toPath()
-                    .resolve("JsScripts").resolve("types");
+                    .resolve("JsScripts");
+
+            Files.writeString(out.resolve("jsconfig.json"), """
+                    {
+                        "compilerOptions": {
+                            "typeRoots": ["types/global.d.ts"]
+                        }
+                    }
+                    """);
+
+            out = out.resolve("types");
+
+            Files.writeString(out.resolve("global.d.ts"), """
+                    declare const script: import("../types/de/blazemcworld/jsscripts/Script").default;
+                    """);
 
             JsScripts.displayChat(Text.literal("Scanning available classes...").formatted(Formatting.AQUA));
 
