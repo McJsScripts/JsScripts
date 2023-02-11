@@ -35,6 +35,10 @@ public class TypingGen {
             Path out = JsScripts.MC.runDirectory.toPath()
                     .resolve("JsScripts");
 
+            if (!out.toFile().exists()) {
+                out.toFile().mkdirs();
+            }
+
             Files.writeString(out.resolve("jsconfig.json"), """
                     {
                         "compilerOptions": {
@@ -47,6 +51,10 @@ public class TypingGen {
                     """);
 
             out = out.resolve("types");
+
+            if (!out.toFile().exists()) {
+                out.toFile().mkdirs();
+            }
 
             Files.writeString(out.resolve("global.d.ts"), """
                     declare const script: import("../types/de/blazemcworld/jsscripts/Script").default;
