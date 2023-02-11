@@ -38,7 +38,10 @@ public class TypingGen {
             Files.writeString(out.resolve("jsconfig.json"), """
                     {
                         "compilerOptions": {
-                            "typeRoots": ["types/global.d.ts"]
+                            "typeRoots": ["types/global.d.ts"],
+                            "paths": {
+                                "types/*": ["./types/*"]
+                            }
                         }
                     }
                     """);
