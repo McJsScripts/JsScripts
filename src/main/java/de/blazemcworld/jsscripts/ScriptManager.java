@@ -5,9 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -239,14 +237,14 @@ public class ScriptManager {
         });
         Injector.transformMethod("com.oracle.truffle.host.HostInteropReflect", "findMethod", method -> {
             try {
-                InsnList instructions = new InsnList();
-
-                instructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                instructions.add(new VarInsnNode(Opcodes.ALOAD, 2));
-                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "de/blazemcworld/jsscripts/Mappings", "graalRemapMethod", "(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/String;"));
-                instructions.add(new VarInsnNode(Opcodes.ASTORE, 2));
-
-                method.instructions.insertBefore(method.instructions.getFirst(), instructions);
+                method.instructions.clear();
+                method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                method.instructions.add(new VarInsnNode(Opcodes.ILOAD, 3));
+                method.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "de/blazemcworld/jsscripts/Mappings", "graalRemapOverloadedMethod", "(Ljava/lang/Object;Ljava/lang/Class;Ljava/lang/String;Z)Ljava/lang/Object;"));
+                method.instructions.add(new TypeInsnNode(Opcodes.CHECKCAST, "com/oracle/truffle/host/HostMethodDesc"));
+                method.instructions.add(new InsnNode(Opcodes.ARETURN));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
