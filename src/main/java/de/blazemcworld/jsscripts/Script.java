@@ -27,9 +27,11 @@ public class Script {
     private final String hash;
     private final Map<String, Value> exports = new HashMap<>();
     private final Map<String, List<Runnable>> exportCallbacks = new HashMap<>();
+    private final LoadCause cause;
 
-    public Script(File file, boolean trusted) throws Exception {
+    public Script(File file, boolean trusted, LoadCause cause) throws Exception {
         this.file = file;
+        this.cause = cause;
 
         String rawSource = Files.readString(file.toPath());
         hash = Crypt.hash(rawSource);
@@ -159,5 +161,14 @@ public class Script {
 
     public String getHash() {
         return hash;
+    }
+
+    public LoadCause getCause() {
+        return cause;
+    }
+
+    enum LoadCause {
+        DEPENDED_UPON,
+        DIRECT
     }
 }

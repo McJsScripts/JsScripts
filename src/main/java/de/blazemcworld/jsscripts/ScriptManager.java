@@ -14,9 +14,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -26,10 +24,11 @@ public class ScriptManager {
     public static final List<Script> scripts = new ArrayList<>();
     public static final File scriptDir = JsScripts.MC.runDirectory.toPath()
             .resolve("JsScripts").resolve("scripts").toFile();
-    private static final File config = JsScripts.MC.runDirectory.toPath()
+    public static final File config = JsScripts.MC.runDirectory.toPath()
             .resolve("JsScripts").resolve("jsscripts.json").toFile();
     private static JsonObject configData;
     private static final List<UnknownScript> pending = new ArrayList<>();
+    public static final Set<File> errors = new HashSet<>();
 
     public static void init() {
         ClientLifecycleEvents.CLIENT_STOPPING.register((e) -> shutdown());
@@ -67,9 +66,10 @@ public class ScriptManager {
             File f = scriptDir.toPath().resolve(elm.getAsString()).toFile();
             if (f.exists()) {
                 try {
-                    scripts.add(new Script(f, false));
+                    scripts.add(new Script(f, false, Script.LoadCause.DIRECT));
                 } catch (Exception err) {
                     JsScripts.LOGGER.error("Error initializing " + f);
+                    errors.add(f);
                     err.printStackTrace();
                 }
             } else {
@@ -84,9 +84,10 @@ public class ScriptManager {
                     loadDevScriptsIn(f);
                 } else {
                     try {
-                        scripts.add(new Script(f, true));
+                        scripts.add(new Script(f, true, Script.LoadCause.DIRECT));
                     } catch (Exception err) {
                         JsScripts.LOGGER.error("Error initializing " + f);
+                        errors.add(f);
                         err.printStackTrace();
                     }
                 }
@@ -108,11 +109,12 @@ public class ScriptManager {
                         }
                     }
                     try {
-                        Script newScript = new Script(target, p.trusted());
+                        Script newScript = new Script(target, p.trusted(), Script.LoadCause.DEPENDED_UPON);
                         scripts.add(newScript);
                         p.cb().accept(newScript);
                     } catch (Exception err) {
                         JsScripts.LOGGER.error("Error initializing " + target);
+                        errors.add(target);
                         err.printStackTrace();
                     }
                 } else if (p.source().startsWith("https:")) {
@@ -176,9 +178,10 @@ public class ScriptManager {
                 continue;
             }
             try {
-                scripts.add(new Script(f, true));
+                scripts.add(new Script(f, true, Script.LoadCause.DIRECT));
             } catch (Exception err) {
                 JsScripts.LOGGER.error("Error initializing " + f);
+                errors.add(f);
                 err.printStackTrace();
             }
         }
@@ -205,6 +208,7 @@ public class ScriptManager {
             s.close();
         }
         scripts.clear();
+        errors.clear();
     }
 
     private static void injectMappings() {
@@ -287,5 +291,14 @@ public class ScriptManager {
             }
         }
         return source;
+    }
+
+    public static Script scriptByFile(File f) {
+        for (Script s : scripts) {
+            if (s.getFile().equals(f)) {
+                return s;
+            }
+        }
+        return null;
     }
 }
