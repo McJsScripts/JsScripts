@@ -138,7 +138,7 @@ public class ScriptManager {
 
                         String preferredName = p.source().substring(p.source().lastIndexOf("/") + 1);
 
-                        if (!preferredName.matches("^[\\w.]{3,50}$")) {
+                        if (!preferredName.matches("^[\\w.-]{3,50}$")) {
                             preferredName = "dependency";
                         }
                         if (preferredName.endsWith(".js")) {
