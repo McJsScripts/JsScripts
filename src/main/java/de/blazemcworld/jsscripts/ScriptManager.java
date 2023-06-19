@@ -4,31 +4,28 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 
 public class ScriptManager {
 
-    public static final List<Script> scripts = new ArrayList<>();
-    public static final File scriptDir = JsScripts.MC.runDirectory.toPath()
-            .resolve("JsScripts").resolve("scripts").toFile();
-    public static final File config = JsScripts.MC.runDirectory.toPath()
-            .resolve("JsScripts").resolve("jsscripts.json").toFile();
-    private static JsonObject configData;
-    private static final List<UnknownScript> pending = new ArrayList<>();
-    public static final Set<File> errors = new HashSet<>();
+    public static final Path modDir = JsScripts.MC.runDirectory.toPath()
+            .resolve("JsScripts");
+    public static final File config = modDir.resolve("jsscripts.json").toFile();
+    public static Context ctx;
+    private static int importCounter = 0;
+    private static final List<Runnable> disableHooks = new ArrayList<>();
+    public static HashSet<String> loadedScripts = new HashSet<>();
+    public static JsonObject configData = null;
 
     public static void init() {
         ClientLifecycleEvents.CLIENT_STOPPING.register((e) -> shutdown());
@@ -36,21 +33,22 @@ public class ScriptManager {
     }
 
     public static void loadScripts() {
-        if (!scriptDir.exists()) scriptDir.mkdirs();
+        ctx = Context.newBuilder()
+                .allowAllAccess(true)
+                .fileSystem(new ScriptFS())
+                .build();
+        if (!modDir.resolve("scripts").toFile().exists()) {
+            modDir.resolve("scripts").toFile().mkdirs();
+        }
 
         injectMappings();
         if (!config.exists()) {
             try {
                 Files.writeString(config.toPath(), """
                         {
-                            "trusted_signatures": [
-                                "%s"
-                            ],
-                            "loaded_scripts": [],
-                            "dev_scripts": [],
-                            "path_aliases": []
+                            "enabled_scripts": []
                         }
-                        """.formatted(Crypt.getKeyPair().getLeft()));
+                        """);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -62,126 +60,16 @@ public class ScriptManager {
             throw new RuntimeException(e);
         }
 
-        for (JsonElement elm : configData.get("loaded_scripts").getAsJsonArray()) {
-            File f = scriptDir.toPath().resolve(elm.getAsString()).toFile();
-            if (f.exists()) {
-                try {
-                    scripts.add(new Script(f, false, Script.LoadCause.DIRECT));
-                } catch (Exception err) {
-                    JsScripts.LOGGER.error("Error initializing " + f);
-                    errors.add(f);
-                    err.printStackTrace();
-                }
-            } else {
-                JsScripts.LOGGER.warn(f + " specified in config, but doesn't exist!");
-            }
-        }
-
-        for (JsonElement elm : configData.get("dev_scripts").getAsJsonArray()) {
-            File f = scriptDir.toPath().resolve(elm.getAsString()).toFile();
-            if (f.exists()) {
-                if (f.isDirectory()) {
-                    loadDevScriptsIn(f);
-                } else {
-                    try {
-                        scripts.add(new Script(f, true, Script.LoadCause.DIRECT));
-                    } catch (Exception err) {
-                        JsScripts.LOGGER.error("Error initializing " + f);
-                        errors.add(f);
-                        err.printStackTrace();
-                    }
-                }
-            } else {
-                JsScripts.LOGGER.warn(f + " specified in config, but doesn't exist!");
-            }
-        }
-
-        resolvePending:
-        while (!pending.isEmpty()) {
-            UnknownScript p = pending.remove(0);
+        for (JsonElement elm : configData.get("enabled_scripts").getAsJsonArray()) {
             try {
-                if (p.source().startsWith("file:")) {
-                    File target = Path.of(URI.create(p.source())).toFile();
-                    for (Script s : scripts) {
-                        if (s.getFile().equals(target)) {
-                            p.cb().accept(s);
-                            continue resolvePending;
-                        }
-                    }
-                    try {
-                        Script newScript = new Script(target, p.trusted(), Script.LoadCause.DEPENDED_UPON);
-                        scripts.add(newScript);
-                        p.cb().accept(newScript);
-                    } catch (Exception err) {
-                        JsScripts.LOGGER.error("Error initializing " + target);
-                        errors.add(target);
-                        err.printStackTrace();
-                    }
-                } else if (p.source().startsWith("https:")) {
-                    for (Script s : scripts) {
-                        if (s.getHash().equals(p.hash())) {
-                            p.cb().accept(s);
-                            continue resolvePending;
-                        }
-                    }
-
-                    for (File f : availableScripts()) {
-                        if (Crypt.hash(Files.readString(f.toPath())).equals(p.hash())) {
-                            pending.add(new UnknownScript(f.toURI().toString(), null, p.cb(), false));
-                            continue resolvePending;
-                        }
-                    }
-                    try (InputStream stream = new URL(p.source()).openStream()) {
-                        String source = new String(stream.readAllBytes());
-                        String remoteHash = Crypt.hash(source);
-                        if (!Objects.equals(remoteHash, p.hash())) {
-                            throw new Exception("Remote content does not match expected hash! Remote: " + remoteHash + " Expected: " + p.hash());
-                        }
-
-                        String preferredName = p.source().substring(p.source().lastIndexOf("/") + 1);
-
-                        if (!preferredName.matches("^[\\w.-]{3,50}$")) {
-                            preferredName = "dependency";
-                        }
-                        if (preferredName.endsWith(".js")) {
-                            preferredName = preferredName.substring(0, preferredName.length() - 3);
-                        }
-
-                        if (scriptDir.toPath().resolve(preferredName + ".js").toFile().exists()) {
-                            int c = 1;
-                            while (scriptDir.toPath().resolve(preferredName + c + ".js").toFile().exists()) {
-                                c++;
-                            }
-                            preferredName += c + ".js";
-                        } else {
-                            preferredName += ".js";
-                        }
-
-                        Path path = scriptDir.toPath().resolve(preferredName);
-                        Files.writeString(path, source);
-                        pending.add(new UnknownScript(path.toAbsolutePath().toUri().toString(), null, p.cb(), false));
-                    }
-                } else {
-                    throw new Exception("Unsupported protocol for " + p.source());
-                }
-            } catch (Exception e) {
-                JsScripts.LOGGER.error("Error loading from " + p.source());
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private static void loadDevScriptsIn(File dir) {
-        for (File f : dir.listFiles()) {
-            if (f.isDirectory()) {
-                loadDevScriptsIn(f);
-                continue;
-            }
-            try {
-                scripts.add(new Script(f, true, Script.LoadCause.DIRECT));
+                importCounter++;
+                ctx.eval(Source.newBuilder("js", """
+                                import * as _%s from "%s";
+                                """.formatted(importCounter, elm.getAsString()), "loader" + importCounter + ".js")
+                        .mimeType("application/javascript+module")
+                        .build());
             } catch (Exception err) {
-                JsScripts.LOGGER.error("Error initializing " + f);
-                errors.add(f);
+                JsScripts.LOGGER.error("Error initializing " + elm.getAsString());
                 err.printStackTrace();
             }
         }
@@ -194,21 +82,20 @@ public class ScriptManager {
     }
 
     public static void shutdown() {
-        for (Script s : scripts) {
-            if (s.onDisable != null) {
-                try {
-                    s.onDisable.run();
-                } catch (Exception err) {
-                    JsScripts.LOGGER.error("Error shutting down " + s.getFile());
-                    err.printStackTrace();
-                }
+        for (Runnable hook : disableHooks) {
+            try {
+                hook.run();
+            } catch (Exception err) {
+                err.printStackTrace();
             }
         }
-        for (Script s : scripts) {
-            s.close();
+        disableHooks.clear();
+        if (ctx != null) {
+            ctx.close();
+            ctx = null;
         }
-        scripts.clear();
-        errors.clear();
+        importCounter = 0;
+        loadedScripts.clear();
     }
 
     private static void injectMappings() {
@@ -255,50 +142,8 @@ public class ScriptManager {
         });
     }
 
-    public static boolean isTrusted(String data, String signature) {
-        for (JsonElement elm : configData.get("trusted_signatures").getAsJsonArray()) {
-            if (Crypt.verify(data, signature, elm.getAsString())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static void addUnknown(String source, String hash, Consumer<Script> cb, boolean trusted) {
-        pending.add(new UnknownScript(source, hash, cb, trusted));
-    }
-
-    public static List<File> availableScripts() throws IOException {
-        List<File> available = new ArrayList<>();
-
-        try (Stream<Path> stream = Files.walk(scriptDir.toPath())) {
-            for (Path p : stream.collect(Collectors.toSet())) {
-                if (Files.isRegularFile(p) && p.toString().endsWith(".js")) {
-                    available.add(p.toFile());
-                }
-            }
-        }
-        return available;
-    }
-
-    public static String resolveAliases(String source) {
-        for (JsonElement elm : configData.get("path_aliases").getAsJsonArray()) {
-            String prefix = elm.getAsJsonObject().get("prefix").getAsString();
-            String target = elm.getAsJsonObject().get("target").getAsString();
-            if (source.startsWith(prefix)) {
-                source = target + source.substring(prefix.length());
-                break;
-            }
-        }
-        return source;
-    }
-
-    public static Script scriptByFile(File f) {
-        for (Script s : scripts) {
-            if (s.getFile().equals(f)) {
-                return s;
-            }
-        }
-        return null;
+    @SuppressWarnings("unused")
+    public static void onDisable(Runnable hook) {
+        disableHooks.add(hook);
     }
 }

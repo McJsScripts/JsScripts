@@ -44,7 +44,9 @@ public class TypingGen {
                         "compilerOptions": {
                             "typeRoots": ["types/global.d.ts"],
                             "paths": {
-                                "types/*": ["./types/*"]
+                                "jvm/*": ["./types/*"],
+                                "jspm/*": ["./jspm/*"],
+                                "local/*": ["./scripts/*"]
                             }
                         }
                     }
