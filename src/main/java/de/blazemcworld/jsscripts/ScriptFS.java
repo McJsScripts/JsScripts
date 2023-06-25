@@ -1,22 +1,24 @@
 package de.blazemcworld.jsscripts;
 
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 import org.apache.commons.io.file.spi.FileSystemProviders;
 import org.graalvm.polyglot.io.FileSystem;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.FileAttribute;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public class ScriptFS implements FileSystem {
-
-    private static final HashMap<Path, String> paths = new HashMap<>();
 
     @Override
     public Path parsePath(URI uri) {
@@ -25,9 +27,7 @@ public class ScriptFS implements FileSystem {
 
     @Override
     public Path parsePath(String path) {
-        Path p = Path.of(path);
-        paths.put(p, path);
-        return p;
+        return Path.of(path);
     }
 
     @Override
@@ -47,21 +47,26 @@ public class ScriptFS implements FileSystem {
 
     @Override
     public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs) throws IOException {
-        String actual = paths.get(path);
-
-        if (actual.startsWith("jvm/")) {
+        String relative = JsScripts.MC.runDirectory.toPath().toAbsolutePath().toAbsolutePath().relativize(path.toAbsolutePath()).toString();
+        if (relative.startsWith("$")) {
             return new SeekableInMemoryByteChannel("""
                     export default Java.type("%s");
-                    """.formatted(actual.substring(4).replaceAll("\\/", ".")).getBytes(StandardCharsets.UTF_8));
+                    """.formatted(relative.substring(1).replaceAll(Pattern.quote(File.separator), ".")).getBytes(StandardCharsets.UTF_8));
         }
-        if (actual.startsWith("local/") || actual.startsWith("jspm/")) {
-            if (actual.startsWith("local")) {
-                actual = actual.replaceFirst("local", "scripts");
+        if (relative.startsWith("#")) {
+            if (!Files.exists(ScriptManager.modDir.resolve("scripts").resolve(relative.substring(1)))) {
+                JsScripts.displayChat(Text.literal("Script '" + relative.substring(1) + "' does not exist. Click to attempt to download from jspm.").formatted(Formatting.RED)
+                        .styled(s -> s.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/jsscripts download " + relative.substring(1)))));
             }
-            path = ScriptManager.modDir.resolve(actual);
-            ScriptManager.loadedScripts.add(path.toAbsolutePath().toString());
+            return new SeekableInMemoryByteChannel("""
+                    export * from "%s";
+                    """.formatted("JsScripts/scripts/" + relative.substring(1) + "/index.js").getBytes(StandardCharsets.UTF_8));
+        }
+        if (!path.toAbsolutePath().toString().endsWith(".js")) {
+            path = Path.of(path.toAbsolutePath() + ".js");
         }
 
+        ScriptManager.loadedScripts.add(path.toAbsolutePath().toString());
         return FileSystemProviders.getFileSystemProvider(path).newByteChannel(path, options, attrs);
     }
 

@@ -64,7 +64,7 @@ public class ScriptManager {
             try {
                 importCounter++;
                 ctx.eval(Source.newBuilder("js", """
-                                import * as _%s from "%s";
+                                import * as _%s from "JsScripts/scripts/%s/index.js";
                                 """.formatted(importCounter, elm.getAsString()), "loader" + importCounter + ".js")
                         .mimeType("application/javascript+module")
                         .build());
