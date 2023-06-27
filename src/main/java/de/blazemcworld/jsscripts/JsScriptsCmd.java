@@ -2,6 +2,7 @@ package de.blazemcworld.jsscripts;
 
 import com.google.gson.*;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.sun.jna.platform.FileUtils;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.minecraft.MinecraftVersion;
 import net.minecraft.text.ClickEvent;
@@ -35,6 +36,7 @@ public class JsScriptsCmd {
                     JsScripts.displayChat(Text.literal("/jsscripts disable - Remove a script from the auto-enable list.").formatted(Formatting.AQUA));
                     JsScripts.displayChat(Text.literal("/jsscripts upload - Upload a script to jspm.").formatted(Formatting.AQUA));
                     JsScripts.displayChat(Text.literal("/jsscripts download - Download a script from jspm.").formatted(Formatting.AQUA));
+                    JsScripts.displayChat(Text.literal("/jsscripts update - Check for script updates from jspm.").formatted(Formatting.AQUA));
                     return 1;
                 })
                 .then(literal("reload")
@@ -219,6 +221,7 @@ public class JsScriptsCmd {
                                                         MinecraftVersion.CURRENT.getName()
                                                 ));
                                                 JsScripts.displayChat(Text.literal("Please update the newly created jspm.json file in the script if necessary, then retry.").formatted(Formatting.AQUA));
+                                                JsScripts.displayChat(Text.literal("It is also recommended to have a README.md and LICENSE file, as the code will be made public.").formatted(Formatting.AQUA));
                                                 return;
                                             }
 
@@ -272,8 +275,14 @@ public class JsScriptsCmd {
                                             }
 
                                             if (root.toFile().exists()) {
-                                                JsScripts.displayChat(Text.literal("Script already found locally! Delete it to re-download.").formatted(Formatting.RED));
-                                                return;
+                                                FileUtils fu = FileUtils.getInstance();
+                                                if (fu.hasTrash()) {
+                                                    fu.moveToTrash(root.toFile());
+                                                    JsScripts.displayChat(Text.literal("Moved previous script version to the trash.").formatted(Formatting.AQUA));
+                                                } else {
+                                                    JsScripts.displayChat(Text.literal("Script already found locally! Delete it to re-download.").formatted(Formatting.RED));
+                                                    return;
+                                                }
                                             }
 
                                             JsScripts.displayChat(Text.literal("Downloading script from JSPM...").formatted(Formatting.AQUA));
@@ -289,6 +298,42 @@ public class JsScriptsCmd {
                                     return 1;
                                 })
                         )
+                )
+                .then(literal("update")
+                        .executes((e) -> {
+                            new Thread(() -> {
+                                int updates = 0;
+                                for (File f : ScriptManager.modDir.resolve("scripts").toFile().listFiles()) {
+                                    try {
+                                        Path p = f.toPath().resolve("jspm.json");
+                                        if (!Files.exists(p)) {
+                                            JsScripts.displayChat(Text.literal(f.getName() + ": No jspm.json").formatted(Formatting.AQUA));
+                                            continue;
+                                        }
+                                        String ver = JsonParser.parseString(Files.readString(p)).getAsJsonObject().getAsJsonObject("version").get("pkg").getAsString();
+
+                                        try {
+                                            String remoteVer = JSPM.getVersion(f.getName());
+                                            if (ver.equals(remoteVer)) {
+                                                JsScripts.displayChat(Text.literal(f.getName() + ": Up to date. (" + ver + ")").formatted(Formatting.AQUA));
+                                            } else {
+                                                JsScripts.displayChat(Text.literal(f.getName() + ": Update available. (" + ver + " => " + remoteVer + ")").formatted(Formatting.GREEN)
+                                                        .styled(s -> s.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/jsscripts download " + f.getName()))));
+                                                updates++;
+                                            }
+                                        } catch (Exception unknown) {
+                                            JsScripts.displayChat(Text.literal(f.getName() + ": No remote found.").formatted(Formatting.RED));
+                                        }
+                                    } catch (Exception err) {
+                                        JsScripts.displayChat(Text.literal(f.getName() + ": Unknown Error").formatted(Formatting.RED));
+                                    }
+                                }
+                                if (updates > 0) {
+                                    JsScripts.displayChat(Text.literal(updates + " updates found. Click them to update.").formatted(Formatting.GREEN));
+                                }
+                            }).start();
+                            return 1;
+                        })
                 )
         ));
     }

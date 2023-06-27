@@ -35,7 +35,9 @@ public class JSPM {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(zip))
                 .build();
 
-        JsonObject res = JsonParser.parseString(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject();
+        String strRes = client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+        JsScripts.LOGGER.info(strRes);
+        JsonObject res = JsonParser.parseString(strRes).getAsJsonObject();
         if (!res.get("success").getAsBoolean()) {
             throw new Exception(res.get("error").getAsString());
         }
@@ -52,7 +54,10 @@ public class JSPM {
                 .uri(URI.create(HOST + "/auth/getnonce/" + JsScripts.MC.getSession().getProfile().getId().toString()))
                 .build();
 
-        JsonObject nonceRes = JsonParser.parseString(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject();
+
+        String nonceStrRes = client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+        JsScripts.LOGGER.info(nonceStrRes);
+        JsonObject nonceRes = JsonParser.parseString(nonceStrRes).getAsJsonObject();
         if (!nonceRes.get("success").getAsBoolean()) {
             throw new Exception(nonceRes.get("error").getAsString());
         }
@@ -90,12 +95,14 @@ public class JSPM {
                         """.formatted(clientNonce)))
                 .build();
 
-        JsonObject tokenRes = JsonParser.parseString(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject();
+        String tokenStrRes = client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+        JsScripts.LOGGER.info(tokenStrRes);
+        JsonObject tokenRes = JsonParser.parseString(tokenStrRes).getAsJsonObject();
         if (!tokenRes.get("success").getAsBoolean()) {
             throw new Exception(nonceRes.get("error").getAsString());
         }
         token = tokenRes.get("token").getAsString();
-        expires = System.currentTimeMillis() + 50 * 60 * 1000;
+        expires = tokenRes.get("expireIn").getAsLong();
 
         return token;
     }
@@ -139,5 +146,15 @@ public class JSPM {
                 .build();
 
         return client.send(req, HttpResponse.BodyHandlers.discarding()).statusCode() != 404;
+    }
+
+    public static String getVersion(String name) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create("https://raw.githubusercontent.com/McJsScripts/JSPMRegistry/master/packages/" + name + "/jspm.json"))
+                .build();
+
+        return JsonParser.parseString(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).getAsJsonObject().getAsJsonObject("version").get("pkg").getAsString();
     }
 }

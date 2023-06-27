@@ -42,7 +42,6 @@ public class TypingGen {
             Files.writeString(out.resolve("jsconfig.json"), """
                     {
                         "compilerOptions": {
-                            "typeRoots": ["types/global.d.ts"],
                             "paths": {
                                 "$*": ["./types/*"],
                                 "#*": ["./scripts/*"]
@@ -56,10 +55,6 @@ public class TypingGen {
             if (!out.toFile().exists()) {
                 out.toFile().mkdirs();
             }
-
-            Files.writeString(out.resolve("global.d.ts"), """
-                    declare const script: import("../types/de/blazemcworld/jsscripts/Script").default;
-                    """);
 
             JsScripts.displayChat(Text.literal("Scanning available classes...").formatted(Formatting.AQUA));
 
