@@ -206,21 +206,26 @@ public class JsScriptsCmd {
                                             if (!configFile.toFile().exists()) {
                                                 Files.writeString(configFile, """
                                                         {
-                                                            "author": {
-                                                                "name": "%s",
-                                                                "uuid": "%s"
-                                                            },
-                                                            "version": {
-                                                                "pkg": "1.0.0",
-                                                                "minecraft": "%s"
-                                                            }
-                                                        }
+                                                             "author": {
+                                                                 "name": "%s",
+                                                                 "uuid": "%s"
+                                                             },
+                                                             "version": {
+                                                                 "pkg": "1.0.0",
+                                                                 "minecraft": "%s"
+                                                             },
+                                                             "displayName": "%s",
+                                                             "description": "",
+                                                             "tags": [],
+                                                             "private": false
+                                                         }
                                                         """.formatted(
                                                         JsScripts.MC.getSession().getProfile().getName(),
                                                         JsScripts.MC.getSession().getProfile().getId().toString(),
-                                                        MinecraftVersion.CURRENT.getName()
+                                                        MinecraftVersion.CURRENT.getName(),
+                                                        name
                                                 ));
-                                                JsScripts.displayChat(Text.literal("Please update the newly created jspm.json file in the script if necessary, then retry.").formatted(Formatting.AQUA));
+                                                JsScripts.displayChat(Text.literal("Please update the newly created jspm.json file in the script, then retry.").formatted(Formatting.AQUA));
                                                 JsScripts.displayChat(Text.literal("It is also recommended to have a README.md and LICENSE file, as the code will be made public.").formatted(Formatting.AQUA));
                                                 return;
                                             }
