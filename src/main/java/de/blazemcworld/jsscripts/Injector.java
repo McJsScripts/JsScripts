@@ -79,6 +79,8 @@ public class Injector {
             className = Mappings.remapClass("named", Mappings.current(), className);
             String slashName = className.replace('.', '/');
 
+            Class.forName(className); //ensure class is loaded
+
             ClassFileTransformer classFileTransformer = new ClassFileTransformer() {
                 @Override
                 public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
