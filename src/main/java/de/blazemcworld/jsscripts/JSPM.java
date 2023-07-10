@@ -21,7 +21,7 @@ import java.util.Random;
 
 public class JSPM {
 
-    private static final String HOST = "https://backend-1-a2537223.deta.app";
+    private static final String HOST = "https://backend-userunp.vercel.app";
     private static String token = "";
     private static long expires = 0;
 
